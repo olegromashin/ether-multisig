@@ -7,19 +7,22 @@ error CannotVoteTwice();
 error CannotRetractWhenNotVoted();
 error NotEnoughVotes();
 error ExternalCallFailed();
+error VotingClosed();
+error VotingDoesNotExist();
 
 contract MultiSigWallet {
-    struct openVoting {
+    struct voting {
         uint256 id;
         address callee;
         bytes fn;
         uint256 weiAmount;
         address[] votes;
+        bool isOpened;
     }
 
-    mapping(address => bool) isOwner;
+    mapping(address => bool) public isOwner;
     uint256 public ownersAmount;
-    openVoting[] public openVotings;
+    voting[] public votings;
     uint256 public votingsCounter = 0;
 
     event NewVoting(uint256 id, address callee, bytes fn, uint256 weiAmount);
@@ -44,32 +47,33 @@ contract MultiSigWallet {
     }
 
     function newVoting(address callee, bytes memory fn, uint256 weiAmount) external onlyOwner returns (uint256) {
-        uint256 votingId = nextVotingNum();
+        uint256 votingId = _nextVotingNum();
         address[] memory votes;
-        openVotings.push(openVoting(votingId, callee, fn, weiAmount, votes));
+        votings.push(voting(votingId, callee, fn, weiAmount, votes, true));
         emit NewVoting(votingId, callee, fn, weiAmount);
         return votingId;
     }
 
     function voteFor(uint256 votingId) external onlyOwner {
-        uint256 votesAmount = openVotings[votingId].votes.length;
+        if(votingId >= votingsCounter) revert VotingDoesNotExist();
+        if(!votings[votingId].isOpened) revert VotingClosed();
+        uint256 votesAmount = votings[votingId].votes.length;
         for(uint256 i = 0; i < votesAmount; i++) {
-            if(openVotings[votingId].votes[i] == msg.sender) {
+            if(votings[votingId].votes[i] == msg.sender) {
                 revert CannotVoteTwice();
             }
         }
-        openVotings[votingId].votes.push(msg.sender);
+        votings[votingId].votes.push(msg.sender);
         emit VoteFor(votingId, msg.sender);
     }
 
-    function retractVote(uint256 votingId) external onlyOwner{
-        uint256 votesAmount = openVotings[votingId].votes.length;
+    function retractVote(uint256 votingId) external onlyOwner {
+        if(votingId >= votingsCounter) revert VotingDoesNotExist();
+        if(!votings[votingId].isOpened) revert VotingClosed();
+        uint256 votesAmount = votings[votingId].votes.length;
         for(uint256 i = 0; i < votesAmount; i++) {
-            if(openVotings[votingId].votes[i] == msg.sender) {
-                removeByIndex(i, openVotings[votingId].votes);
-                if(votesAmount == 1) {
-                    removeByIndex(votingId, openVotings);
-                }
+            if(votings[votingId].votes[i] == msg.sender) {
+                _removeByIndex(i, votings[votingId].votes);
                 emit RetractVote(votingId, msg.sender);
                 return;
             }
@@ -78,33 +82,30 @@ contract MultiSigWallet {
     }
 
     function callByABI(uint256 votingId) external payable onlyOwner returns (bytes memory) {
+        if(votingId >= votingsCounter) revert VotingDoesNotExist();
+        if(!votings[votingId].isOpened) revert VotingClosed();
         // Check if voting has 51% of votes.
-        if(openVotings[votingId].votes.length * 100 / ownersAmount > 50) {
-            (bool sent, bytes memory data) = openVotings[votingId].callee.call{value: openVotings[votingId].weiAmount}(openVotings[votingId].fn);
+        if(votings[votingId].votes.length * 100 / ownersAmount > 50) {
+            (bool sent, bytes memory data) = votings[votingId].callee.call{value: votings[votingId].weiAmount}(votings[votingId].fn);
             if(!sent)
                 revert ExternalCallFailed();
-            removeByIndex(votingId, openVotings);
+            votings[votingId].isOpened = false;
             emit ExternalCall(votingId, msg.sender);
             return data;
         }
         revert NotEnoughVotes();
     }
 
-    function removeByIndex(uint256 id, address[] storage arr) private {
+    function _removeByIndex(uint256 id, address[] storage arr) private {
         arr[id] = arr[arr.length - 1];
         arr.pop();
     }
 
-    function removeByIndex(uint256 id, openVoting[] storage arr) private {
-        arr[id] = arr[arr.length - 1];
-        arr.pop();
-    }
-
-    function nextVotingNum() private returns (uint256) {
+    function _nextVotingNum() private returns (uint256) {
         return votingsCounter++;
     }
 
-    function getOpenVotings() view external returns (openVoting[] memory) {
-        return openVotings;
+    function getVotings() view external returns (voting[] memory) {
+        return votings;
     }
 }
