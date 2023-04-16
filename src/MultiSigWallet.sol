@@ -10,6 +10,10 @@ error ExternalCallFailed();
 error VotingClosed();
 error VotingDoesNotExist();
 
+/// @notice Conctract allows multi-signature calls having 51% of signatures.
+/// Owners' wallets specified on deploy and cannot be modified after.
+/// @dev All votings for multi-signature calls are stored in "votings" array.
+/// Voting is only deleted from "votings" array if it happened to have 0 votes by calling "retractVote" function. 
 contract MultiSigWallet {
     struct voting {
         uint256 id;
@@ -30,13 +34,15 @@ contract MultiSigWallet {
     event RetractVote(uint256 id, address voter);
     event ExternalCall(uint256 votingId, address caller);
 
-    constructor(address[] memory owners_) {
-        if(owners_.length <= 1)
+    /// @notice Minimum 2 owners. Maximum not limited.
+    /// @param owners - owners' wallets.
+    constructor(address[] memory owners) {
+        if(owners.length <= 1)
             revert NotEnoughOwners();
-        ownersAmount = owners_.length;
+        ownersAmount = owners.length;
         for(uint256 i = 0; i < ownersAmount; i++)
         {
-            isOwner[owners_[i]] = true;
+            isOwner[owners[i]] = true;
         }
     }
 
@@ -46,14 +52,21 @@ contract MultiSigWallet {
         _;
     }
 
+    /// @notice Opens new voting.
+    /// @param callee - address of the callee contract.
+    /// @param fn - ABI encoded function call.
+    /// @param weiAmount - amount of WEI to transfer to callee.
+    /// @return Identifier of the new voting.
     function newVoting(address callee, bytes memory fn, uint256 weiAmount) external onlyOwner returns (uint256) {
-        uint256 votingId = _nextVotingNum();
+        uint256 votingId = _nextVotingId();
         address[] memory votes;
         votings.push(voting(votingId, callee, fn, weiAmount, votes, true));
         emit NewVoting(votingId, callee, fn, weiAmount);
         return votingId;
     }
 
+    /// @notice Allows vote for an opened voting.
+    /// @param votingId - identifier of the voting.
     function voteFor(uint256 votingId) external onlyOwner {
         if(votingId >= votingsCounter) revert VotingDoesNotExist();
         if(!votings[votingId].isOpened) revert VotingClosed();
@@ -67,6 +80,8 @@ contract MultiSigWallet {
         emit VoteFor(votingId, msg.sender);
     }
 
+    /// @notice Allows retract vote from an opened voting.
+    /// @param votingId - identifier of the voting.
     function retractVote(uint256 votingId) external onlyOwner {
         if(votingId >= votingsCounter) revert VotingDoesNotExist();
         if(!votings[votingId].isOpened) revert VotingClosed();
@@ -81,6 +96,8 @@ contract MultiSigWallet {
         revert CannotRetractWhenNotVoted();
     }
 
+    /// @notice Perform call if voting has 51% of votes.
+    /// @param votingId - identifier of the voting.
     function callByABI(uint256 votingId) external payable onlyOwner returns (bytes memory) {
         if(votingId >= votingsCounter) revert VotingDoesNotExist();
         if(!votings[votingId].isOpened) revert VotingClosed();
@@ -96,16 +113,24 @@ contract MultiSigWallet {
         revert NotEnoughVotes();
     }
 
+    /// @notice List of opened votings.
+    function getVotings() view external returns (voting[] memory) {
+        return votings;
+    }
+
+    /// @notice Helper function.
+    /// @dev Check for correctness of id param is made outside. Used only in "retractVote" function.
     function _removeByIndex(uint256 id, address[] storage arr) private {
         arr[id] = arr[arr.length - 1];
         arr.pop();
     }
 
-    function _nextVotingNum() private returns (uint256) {
+    /// @notice Helper function.
+    /// @dev Used only in "newVoting" function.
+    /// @return New voting id.
+    function _nextVotingId() private returns (uint256) {
+        // Notice the order of evaluation here.
+        // Firstly we return a value and only after increase it by 1.
         return votingsCounter++;
-    }
-
-    function getVotings() view external returns (voting[] memory) {
-        return votings;
     }
 }
