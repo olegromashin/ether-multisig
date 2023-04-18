@@ -6,7 +6,7 @@ error Unauthorized();
 error CannotVoteTwice();
 error CannotRetractWhenNotVoted();
 error NotEnoughVotes();
-error ExternalCallFailed();
+error MultiSigActionFailed();
 error VotingClosed();
 error VotingDoesNotExist();
 
@@ -17,7 +17,7 @@ error VotingDoesNotExist();
 contract MultiSigWallet {
     struct voting {
         uint256 id;
-        address callee;
+        address payable callee;
         bytes fn;
         uint256 weiAmount;
         address[] votes;
@@ -32,7 +32,7 @@ contract MultiSigWallet {
     event NewVoting(uint256 id, address callee, bytes fn, uint256 weiAmount);
     event VoteFor(uint256 id, address voter);
     event RetractVote(uint256 id, address voter);
-    event ExternalCall(uint256 votingId, address caller);
+    event MultiSigAction(uint256 votingId, address caller);
 
     /// @notice Minimum 2 owners. Maximum not limited.
     /// @param owners - owners' wallets.
@@ -54,10 +54,10 @@ contract MultiSigWallet {
 
     /// @notice Opens new voting.
     /// @param callee - address of the callee contract.
-    /// @param fn - ABI encoded function call.
+    /// @param fn - ABI encoded function call. If empty string sent only WEI will be transferred.
     /// @param weiAmount - amount of WEI to transfer to callee.
     /// @return Identifier of the new voting.
-    function newVoting(address callee, bytes memory fn, uint256 weiAmount) external onlyOwner returns (uint256) {
+    function newVoting(address payable callee, bytes memory fn, uint256 weiAmount) external onlyOwner returns (uint256) {
         uint256 votingId = _nextVotingId();
         address[] memory votes;
         votings.push(voting(votingId, callee, fn, weiAmount, votes, true));
@@ -96,21 +96,19 @@ contract MultiSigWallet {
         revert CannotRetractWhenNotVoted();
     }
 
-    /// @notice Perform call if voting has 51% of votes.
+    /// @notice Perform action if voting has 51% of votes.
+    /// Perform contract's call if the voting's "fn" is not empty, sends WEI otherwise.
     /// @param votingId - identifier of the voting.
-    function callByABI(uint256 votingId) external payable onlyOwner returns (bytes memory) {
+    function multiSigAction(uint256 votingId) external payable onlyOwner {
         if(votingId >= votingsCounter) revert VotingDoesNotExist();
         if(!votings[votingId].isOpened) revert VotingClosed();
         // Check if voting has 51% of votes.
-        if(votings[votingId].votes.length * 100 / ownersAmount > 50) {
-            (bool sent, bytes memory data) = votings[votingId].callee.call{value: votings[votingId].weiAmount}(votings[votingId].fn);
-            if(!sent)
-                revert ExternalCallFailed();
-            votings[votingId].isOpened = false;
-            emit ExternalCall(votingId, msg.sender);
-            return data;
-        }
-        revert NotEnoughVotes();
+        if(votings[votingId].votes.length * 100 / ownersAmount <= 50) revert NotEnoughVotes();
+        (bool sent, /*bytes memory data*/) = votings[votingId].callee.call{value: votings[votingId].weiAmount}(votings[votingId].fn);
+        if(!sent)
+            revert MultiSigActionFailed();
+        votings[votingId].isOpened = false;
+        emit MultiSigAction(votingId, msg.sender);
     }
 
     /// @notice List of opened votings.

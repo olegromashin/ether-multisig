@@ -25,7 +25,7 @@ contract MultiSigWalletTest is Test {
     }
 
     function testVoteFor() public {
-        uint256 votingId = multiSigWallet.newVoting(address(testContract), abi.encodeWithSignature("next()"), 0);
+        uint256 votingId = multiSigWallet.newVoting(payable(address(testContract)), abi.encodeWithSignature("next()"), 0);
         multiSigWallet.voteFor(votingId);
         assertEq(multiSigWallet.getVotings().length, 1);
         assertEq(multiSigWallet.getVotings()[0].votes.length, 1);
@@ -33,7 +33,7 @@ contract MultiSigWalletTest is Test {
     }
 
     function testTwoVotes() public {
-        uint256 votingId = multiSigWallet.newVoting(address(testContract), abi.encodeWithSignature("next()"), 0);
+        uint256 votingId = multiSigWallet.newVoting(payable(address(testContract)), abi.encodeWithSignature("next()"), 0);
         multiSigWallet.voteFor(votingId);
         vm.prank(address(0));
         multiSigWallet.voteFor(votingId);
@@ -41,21 +41,21 @@ contract MultiSigWalletTest is Test {
     }
 
     function testCannotVoteTwice() public {
-        uint256 votingId = multiSigWallet.newVoting(address(testContract), abi.encodeWithSignature("next()"), 0);
+        uint256 votingId = multiSigWallet.newVoting(payable(address(testContract)), abi.encodeWithSignature("next()"), 0);
         multiSigWallet.voteFor(votingId);
         vm.expectRevert(CannotVoteTwice.selector);
         multiSigWallet.voteFor(votingId);
     }
 
     function testCannotVoteIfNotOwner() public {
-        uint256 votingId = multiSigWallet.newVoting(address(testContract), abi.encodeWithSignature("next()"), 0);
+        uint256 votingId = multiSigWallet.newVoting(payable(address(testContract)), abi.encodeWithSignature("next()"), 0);
         vm.prank(address(2));
         vm.expectRevert(Unauthorized.selector);
         multiSigWallet.voteFor(votingId);
     }
 
     function testRetractVote() public {
-        uint256 votingId = multiSigWallet.newVoting(address(testContract), abi.encodeWithSignature("next()"), 0);
+        uint256 votingId = multiSigWallet.newVoting(payable(address(testContract)), abi.encodeWithSignature("next()"), 0);
         multiSigWallet.voteFor(votingId);
         vm.prank(address(0));
         multiSigWallet.voteFor(votingId);
@@ -65,7 +65,7 @@ contract MultiSigWalletTest is Test {
     }
 
     function testCannotRetractVoteIfNotVoted() public {
-        uint256 votingId = multiSigWallet.newVoting(address(testContract), abi.encodeWithSignature("next()"), 0);
+        uint256 votingId = multiSigWallet.newVoting(payable(address(testContract)), abi.encodeWithSignature("next()"), 0);
         multiSigWallet.voteFor(votingId);
         vm.prank(address(0));
         vm.expectRevert(CannotRetractWhenNotVoted.selector);
@@ -83,80 +83,92 @@ contract MultiSigWalletTest is Test {
         multiSigWallet.retractVote(0);
     }
 
-    function testCallByAbi() public {
+    function testMultiSigActionOnlyFnCall() public {
         // bytes(hex"4c8fe526") is the same as abi.encodeWithSignature("next()") that is used in other tests
         // Just tried different method
-        uint256 votingId = multiSigWallet.newVoting(address(testContract), bytes(hex"4c8fe526"), 0);
+        uint256 votingId = multiSigWallet.newVoting(payable(address(testContract)), bytes(hex"4c8fe526"), 0);
         multiSigWallet.voteFor(votingId);
         vm.prank(address(0));
         multiSigWallet.voteFor(votingId);
-        multiSigWallet.callByABI(votingId);
+        multiSigWallet.multiSigAction(votingId);
         assertEq(testContract.counter(), 1);
     }
 
-    function testCallByAbiAfterAnotherVotingClosed() public {
-        uint256 votingId1 = multiSigWallet.newVoting(address(testContract), abi.encodeWithSignature("next()"), 0);
-        uint256 votingId2 = multiSigWallet.newVoting(address(testContract), abi.encodeWithSignature("next()"), 0);
+    function testMultiSigActionOnlyWeiTransfer() public {
+        vm.deal(address(multiSigWallet), 100e18);
+        bytes memory emptyArr;
+        uint256 votingId = multiSigWallet.newVoting(payable(address(1)), emptyArr, 10e18);
+        multiSigWallet.voteFor(votingId);
+        vm.prank(address(0));
+        multiSigWallet.voteFor(votingId);
+        multiSigWallet.multiSigAction(votingId);
+        assertEq(address(multiSigWallet).balance, 90e18);
+        assertEq(address(1).balance, 10e18);
+    }
+
+    function testMultiSigActionAfterAnotherVotingClosed() public {
+        uint256 votingId1 = multiSigWallet.newVoting(payable(address(testContract)), abi.encodeWithSignature("next()"), 0);
+        uint256 votingId2 = multiSigWallet.newVoting(payable(address(testContract)), abi.encodeWithSignature("next()"), 0);
         multiSigWallet.voteFor(votingId1);
         multiSigWallet.voteFor(votingId2);
         vm.prank(address(0));
         multiSigWallet.voteFor(votingId1);
         vm.prank(address(0));
         multiSigWallet.voteFor(votingId2);
-        multiSigWallet.callByABI(votingId1);
-        multiSigWallet.callByABI(votingId2);
+        multiSigWallet.multiSigAction(votingId1);
+        multiSigWallet.multiSigAction(votingId2);
         assertEq(testContract.counter(), 2);
     }
 
-    function testCannotCallByAbiIfVotingNotExists() public {
+    function testCannotDoMultiSigActionIfVotingNotExists() public {
         vm.expectRevert(VotingDoesNotExist.selector);
-        multiSigWallet.callByABI(0);
+        multiSigWallet.multiSigAction(0);
     }
 
-    function testCallByAbiWithSendingWei() public {
+    function testMultiSigActionWithSendingWei() public {
         vm.deal(address(multiSigWallet), 100e18);
-        uint256 votingId = multiSigWallet.newVoting(address(testContract), abi.encodeWithSignature("next()"), 10e18);
+        uint256 votingId = multiSigWallet.newVoting(payable(address(testContract)), abi.encodeWithSignature("next()"), 10e18);
         multiSigWallet.voteFor(votingId);
         vm.prank(address(0));
         multiSigWallet.voteFor(votingId);
-        multiSigWallet.callByABI(votingId);
+        multiSigWallet.multiSigAction(votingId);
         assertEq(testContract.counter(), 1);
         assertEq(address(multiSigWallet).balance, 90e18);
         assertEq(address(testContract).balance, 10e18);
     }
 
-    function testCannotTwiceCallByAbi() public {
-        uint256 votingId = multiSigWallet.newVoting(address(testContract), abi.encodeWithSignature("next()"), 0);
+    function testCannotDoTwiceMultiSigAction() public {
+        uint256 votingId = multiSigWallet.newVoting(payable(address(testContract)), abi.encodeWithSignature("next()"), 0);
         multiSigWallet.voteFor(votingId);
         vm.prank(address(0));
         multiSigWallet.voteFor(votingId);
-        multiSigWallet.callByABI(votingId);
+        multiSigWallet.multiSigAction(votingId);
         vm.expectRevert(VotingClosed.selector);
-        multiSigWallet.callByABI(votingId);
+        multiSigWallet.multiSigAction(votingId);
     }
 
-    function testCannotCallByAbiIfNotEnoughVotes() public {
-        uint256 votingId = multiSigWallet.newVoting(address(testContract), abi.encodeWithSignature("next()"), 0);
+    function testCannotdoMultiSigActionIfNotEnoughVotes() public {
+        uint256 votingId = multiSigWallet.newVoting(payable(address(testContract)), abi.encodeWithSignature("next()"), 0);
         multiSigWallet.voteFor(votingId);
         vm.expectRevert(NotEnoughVotes.selector);
-        multiSigWallet.callByABI(votingId);
+        multiSigWallet.multiSigAction(votingId);
     }
 
-    function testCannotCallByAbiIfNotOwner() public {
+    function testCannotDoMultiSigActionIfNotOwner() public {
         vm.prank(address(2));
         vm.expectRevert(Unauthorized.selector);
-        multiSigWallet.callByABI(0);
+        multiSigWallet.multiSigAction(0);
     }
 
     function testDontSendWeiIfCallFunctionCorrupted() public {
         vm.deal(address(multiSigWallet), 100e18);
         uint256 startBalance = address(multiSigWallet).balance;
-        uint256 votingId = multiSigWallet.newVoting(address(testContract), abi.encodeWithSignature("grrgt"), 10e18);
+        uint256 votingId = multiSigWallet.newVoting(payable(address(testContract)), abi.encodeWithSignature("grrgt"), 10e18);
         multiSigWallet.voteFor(votingId);
         vm.prank(address(0));
         multiSigWallet.voteFor(votingId);
-        vm.expectRevert(ExternalCallFailed.selector);
-        multiSigWallet.callByABI(votingId);
+        vm.expectRevert(MultiSigActionFailed.selector);
+        multiSigWallet.multiSigAction(votingId);
         assertEq(startBalance, address(multiSigWallet).balance);
     }
 }

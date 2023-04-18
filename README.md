@@ -10,9 +10,8 @@ Account for multiple (at least 2) constant owners. Requires 51% of votes to make
 
 `retractVote` - retracts sender's vote if voted before.
 
-`callByABI` - makes external call if voting has 51% of votes and if sender is one of the owners.
+`multiSigCall` - makes external call if voting has 51% of votes and if sender is one of the owners.
 
 ## TODO
 
-1. Send native tokens only without needing of external call.
-2. Check if replacing dynamic array of votes to mapping and counter will be better for openVoting struct.
+1. Check if replacing dynamic array of votes to mapping and counter will be better for openVoting struct.
