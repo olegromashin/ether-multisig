@@ -16,7 +16,6 @@ error VotingDoesNotExist();
 /// Voting is only deleted from "votings" array if it happened to have 0 votes by calling "retractVote" function. 
 contract MultiSigWallet {
     struct voting {
-        uint256 id;
         address payable callee;
         bytes fn;
         uint256 weiAmount;
@@ -26,7 +25,7 @@ contract MultiSigWallet {
 
     mapping(address => bool) public isOwner;
     uint256 public ownersAmount;
-    voting[] public votings;
+    mapping(uint256 => voting) public votings;
     uint256 public votingsCounter = 0;
 
     event NewVoting(uint256 id, address callee, bytes fn, uint256 weiAmount);
@@ -60,7 +59,7 @@ contract MultiSigWallet {
     function newVoting(address payable callee, bytes memory fn, uint256 weiAmount) external onlyOwner returns (uint256) {
         uint256 votingId = _nextVotingId();
         address[] memory votes;
-        votings.push(voting(votingId, callee, fn, weiAmount, votes, true));
+        votings[votingId] = voting(callee, fn, weiAmount, votes, true);
         emit NewVoting(votingId, callee, fn, weiAmount);
         return votingId;
     }
@@ -111,11 +110,6 @@ contract MultiSigWallet {
         emit MultiSigAction(votingId, msg.sender);
     }
 
-    /// @notice List of opened votings.
-    function getVotings() view external returns (voting[] memory) {
-        return votings;
-    }
-
     /// @notice Helper function.
     /// @dev Check for correctness of id param is made outside. Used only in "retractVote" function.
     function _removeByIndex(uint256 id, address[] storage arr) private {
@@ -130,5 +124,11 @@ contract MultiSigWallet {
         // Notice the order of evaluation here.
         // Firstly we return a value and only after increase it by 1.
         return votingsCounter++;
+    }
+
+    /// @notice Helper function for tests. Remove on deploy.
+    /// @dev https://stackoverflow.com/questions/72124271/solidity-mapping-not-returns-an-array-in-a-struct
+    function getVotedAddresses(uint256 votingId) public view returns (address[] memory) {
+        return votings[votingId].votes;
     }
 }

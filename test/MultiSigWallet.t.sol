@@ -27,8 +27,7 @@ contract MultiSigWalletTest is Test {
     function testVoteFor() public {
         uint256 votingId = multiSigWallet.newVoting(payable(address(testContract)), abi.encodeWithSignature("next()"), 0);
         multiSigWallet.voteFor(votingId);
-        assertEq(multiSigWallet.getVotings().length, 1);
-        assertEq(multiSigWallet.getVotings()[0].votes.length, 1);
+        assertEq(multiSigWallet.getVotedAddresses(votingId).length, 1);
         assertEq(multiSigWallet.votingsCounter(), 1);
     }
 
@@ -37,7 +36,7 @@ contract MultiSigWalletTest is Test {
         multiSigWallet.voteFor(votingId);
         vm.prank(address(0));
         multiSigWallet.voteFor(votingId);
-        assertEq(multiSigWallet.getVotings()[0].votes.length, 2);
+        assertEq(multiSigWallet.getVotedAddresses(votingId).length, 2);
     }
 
     function testCannotVoteTwice() public {
@@ -60,8 +59,8 @@ contract MultiSigWalletTest is Test {
         vm.prank(address(0));
         multiSigWallet.voteFor(votingId);
         multiSigWallet.retractVote(votingId);
-        assertEq(multiSigWallet.getVotings()[0].votes.length, 1);
-        assertEq(multiSigWallet.getVotings()[0].votes[0], address(address(0)));
+        assertEq(multiSigWallet.getVotedAddresses(votingId).length, 1);
+        assertEq(multiSigWallet.getVotedAddresses(votingId)[0], address(address(0)));
     }
 
     function testCannotRetractVoteIfNotVoted() public {
