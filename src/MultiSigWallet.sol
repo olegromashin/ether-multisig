@@ -68,12 +68,14 @@ contract MultiSigWallet {
     function voteFor(uint256 votingId) external onlyOwner {
         if(votingId >= votingsCounter) revert VotingDoesNotExist();
         if(!votings[votingId].isOpened) revert VotingClosed();
+
         uint256 votesAmount = votings[votingId].votes.length;
         for(uint256 i = 0; i < votesAmount; i++) {
             if(votings[votingId].votes[i] == msg.sender) {
                 revert CannotVoteTwice();
             }
         }
+        
         votings[votingId].votes.push(msg.sender);
         emit VoteFor(votingId, msg.sender);
     }
@@ -83,6 +85,7 @@ contract MultiSigWallet {
     function retractVote(uint256 votingId) external onlyOwner {
         if(votingId >= votingsCounter) revert VotingDoesNotExist();
         if(!votings[votingId].isOpened) revert VotingClosed();
+
         uint256 votesAmount = votings[votingId].votes.length;
         for(uint256 i = 0; i < votesAmount; i++) {
             if(votings[votingId].votes[i] == msg.sender) {
@@ -102,6 +105,7 @@ contract MultiSigWallet {
         if(!votings[votingId].isOpened) revert VotingClosed();
         // Check if voting has 51% of votes.
         if(votings[votingId].votes.length * 100 / ownersAmount <= 50) revert NotEnoughVotes();
+        
         (bool sent, /*bytes memory data*/) = votings[votingId].callee.call{value: votings[votingId].weiAmount}(votings[votingId].fn);
         if(!sent)
             revert MultiSigActionFailed();
