@@ -15,7 +15,7 @@ error VotingDoesNotExist();
 /// @dev All votings for multi-signature calls are stored in "votings" array.
 /// Voting is only deleted from "votings" array if it happened to have 0 votes by calling "retractVote" function. 
 contract MultiSigWallet {
-    struct voting {
+    struct Voting {
         address payable callee;
         bytes fn;
         uint256 weiAmount;
@@ -25,7 +25,7 @@ contract MultiSigWallet {
 
     mapping(address => bool) public isOwner;
     uint256 public ownersAmount;
-    mapping(uint256 => voting) public votings;
+    mapping(uint256 => Voting) public votings;
     uint256 public votingsCounter = 0;
 
     event NewVoting(uint256 indexed votingId, address callee, bytes fn, uint256 weiAmount);
@@ -59,7 +59,7 @@ contract MultiSigWallet {
     function newVoting(address payable callee, bytes memory fn, uint256 weiAmount) external onlyOwner returns (uint256) {
         uint256 votingId = _nextVotingId();
         address[] memory votes;
-        votings[votingId] = voting(callee, fn, weiAmount, votes, true);
+        votings[votingId] = Voting(callee, fn, weiAmount, votes, true);
         emit NewVoting(votingId, callee, fn, weiAmount);
         return votingId;
     }
