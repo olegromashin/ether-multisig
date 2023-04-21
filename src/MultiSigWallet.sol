@@ -28,10 +28,10 @@ contract MultiSigWallet {
     mapping(uint256 => voting) public votings;
     uint256 public votingsCounter = 0;
 
-    event NewVoting(uint256 id, address callee, bytes fn, uint256 weiAmount);
-    event VoteFor(uint256 id, address voter);
-    event RetractVote(uint256 id, address voter);
-    event MultiSigAction(uint256 votingId, address caller);
+    event NewVoting(uint256 indexed votingId, address callee, bytes fn, uint256 weiAmount);
+    event VoteFor(uint256 indexed votingId , address voter);
+    event RetractVote(uint256 indexed votingId, address voter);
+    event MultiSigAction(uint256 indexed votingId, address caller);
 
     /// @notice Minimum 2 owners. Maximum not limited.
     /// @param owners - owners' wallets.
