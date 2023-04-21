@@ -11,3 +11,5 @@ Account for multiple (at least 2) constant owners. Requires 51% of votes to make
 `retractVote` - retracts sender's vote if voted before.
 
 `multiSigCall` - makes external call if voting has 51% of votes and if sender is one of the owners.
+
+`isAddressOwner` - allows to get to know if address is one of the contract's owners.

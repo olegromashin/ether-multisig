@@ -22,10 +22,10 @@ contract MultiSigWallet {
         bool isOpened;
     }
 
-    mapping(address => bool) public isOwner;
-    uint256 public ownersAmount;
-    mapping(uint256 => Voting) public votings;
-    uint256 public votingsCounter = 0;
+    mapping(address => bool) private isOwner;
+    uint256 private ownersAmount;
+    mapping(uint256 => Voting) private votings;
+    uint256 private votingsCounter = 0;
 
     event NewVoting(uint256 indexed votingId, address callee, bytes fn, uint256 weiAmount);
     event VoteFor(uint256 indexed votingId , address voter);
@@ -38,8 +38,7 @@ contract MultiSigWallet {
         if(owners.length <= 1)
             revert NotEnoughOwners();
         ownersAmount = owners.length;
-        for(uint256 i = 0; i < ownersAmount; i++)
-        {
+        for(uint256 i = 0; i < ownersAmount; i++) {
             isOwner[owners[i]] = true;
         }
     }
@@ -75,7 +74,7 @@ contract MultiSigWallet {
                 revert CannotVoteTwice();
             }
         }
-        
+
         votings[votingId].votes.push(msg.sender);
         emit VoteFor(votingId, msg.sender);
     }
@@ -104,13 +103,19 @@ contract MultiSigWallet {
         if(votingId >= votingsCounter) revert VotingDoesNotExist();
         if(!votings[votingId].isOpened) revert VotingClosed();
         // Check if voting has 51% of votes.
-        if(votings[votingId].votes.length * 100 / ownersAmount <= 50) revert NotEnoughVotes();
+        if(votings[votingId].votes.length * 100 / ownersAmount <= 50)
+            revert NotEnoughVotes();
         
         (bool sent, /*bytes memory data*/) = votings[votingId].callee.call{value: votings[votingId].weiAmount}(votings[votingId].fn);
         if(!sent)
             revert MultiSigActionFailed();
         votings[votingId].isOpened = false;
         emit MultiSigAction(votingId, msg.sender);
+    }
+
+    /// @notice Allows to get to know if address is one of the contract's owners.
+    function isAddressOwner(address addr) external view returns (bool) {
+        return isOwner[addr];
     }
 
     /// @notice Helper function.

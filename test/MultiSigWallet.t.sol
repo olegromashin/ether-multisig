@@ -28,7 +28,6 @@ contract MultiSigWalletTest is Test {
         uint256 votingId = multiSigWallet.newVoting(payable(address(testContract)), abi.encodeWithSignature("next()"), 0);
         multiSigWallet.voteFor(votingId);
         assertEq(multiSigWallet.getVotedAddresses(votingId).length, 1);
-        assertEq(multiSigWallet.votingsCounter(), 1);
     }
 
     function testTwoVotes() public {
