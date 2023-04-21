@@ -12,8 +12,7 @@ error VotingDoesNotExist();
 
 /// @notice Conctract allows multi-signature calls having 51% of signatures.
 /// Owners' wallets specified on deploy and cannot be modified after.
-/// @dev All votings for multi-signature calls are stored in "votings" array.
-/// Voting is only deleted from "votings" array if it happened to have 0 votes by calling "retractVote" function. 
+/// @dev All votings for multi-signature calls are stored in "votings" mapping.
 contract MultiSigWallet {
     struct Voting {
         address payable callee;
